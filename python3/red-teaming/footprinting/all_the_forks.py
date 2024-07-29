@@ -70,11 +70,11 @@ if response.status_code == 200:
             commit_data = commit_response.json()
             
             # Write commit data to a file
-            with open(f'./commits_blobs/{fork_owner}_{fork_repo}_{sha1}commit.json', 'w') as f:
+            with open(f'./commits_blobs/{fork_owner}_{fork_repo}_{sha1}_commit.json', 'w') as f:
                 json.dump(commit_data, f, indent=2)
             
             # Print success message to stdout
-            success_message = f'Commit found for: {commit_url}'  + '\n' + f'saving JSON blob to {fork_owner}_{fork_repo}_{sha1}_commit.json' + '\n'
+            success_message = f'Commit found for: {commit_url}'  + '\n' + f'saving JSON blob to ./commits_blobs/{fork_owner}_{fork_repo}_{sha1}_commit.json' + '\n'
             print(success_message)
             
             # Write success message to a file
