@@ -1,7 +1,7 @@
 from enum import Enum
 from rich.console import Console
 from rich.style import Style
-from rich.table import Table
+from rich.table import Table, box
 from rich.logging import RichHandler
 
 import requests
@@ -75,6 +75,8 @@ def print_message(message_type, message):
     CONSOLE.print(f"{emoji} {message}", style=style)
     logging.info(f"{emoji} {message}")
 
+print_message(MessageType.SUCCESS, f"Instantiated logging: {log_filename}\n")
+
 # Function to clone repositories
 def clone_repo(org, repo):
     repo_path = repos_dir / org / repo
@@ -127,12 +129,16 @@ if not github_token:
     print_message(MessageType.FATAL, "Error: GITHUB_TOKEN environment variable is not set.")
     sys.exit(1)
 
+print_message(MessageType.INFO, f"Scraping programs from https://huntr.com/bounties..\n")
+
 # Make a GET request to the URL
 url = 'https://huntr.com/bounties'
 response = requests.get(url)
 
 # Parse the HTML content using BeautifulSoup
 soup = BeautifulSoup(response.content, 'html.parser')
+
+print_message(MessageType.INFO, f"Parsing program info..\n")
 
 # Find all bounty items
 bounty_items = soup.find_all('div', class_='group flex flex-row')
@@ -166,18 +172,23 @@ headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
+print_message(MessageType.INFO, f"Writing results to CSV and console ..\n")
+
 # Create a table for console output
-table = Table(title="GitHub Repositories")
-table.add_column("Organization", justify="left", style="cyan", no_wrap=True)
-table.add_column("Repo", justify="left", style="magenta", no_wrap=True)
-table.add_column("Repo URL", justify="left", style="green", no_wrap=True)
-table.add_column("Languages", justify="left", style="yellow", no_wrap=True)
+table = Table(title="GitHub Repositories", box=box.MINIMAL_HEAVY_HEAD, show_lines=True)
+table.add_column("Organization", style="cyan", no_wrap=True)
+table.add_column("Repo", style="magenta", no_wrap=True)
+table.add_column("Repo URL", style="green", no_wrap=True)
+table.add_column("Languages", style="yellow")
+table.add_column("Automated Security Fixes", style="red", no_wrap=True)
 
 # Open a CSV file to write the results
 csv_filename = output_dir / f"huntr_repositories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 with open(csv_filename, mode='w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(["Organization", "Repo", "Repo URL", "Languages"])
+    writer.writerow(["Organization", "Repo", "Repo URL", "Languages", "Automated Security Fixes"])
+
+    print(MessageType.INFO, f"Instantiating GitHub API requests..\n")
 
     for organization, repo in repos:
         repo_url = f"{github_api_base_url}/{organization}/{repo}"
@@ -216,12 +227,22 @@ with open(csv_filename, mode='w', newline='') as file:
             print_message(MessageType.FATAL, f"Failed to fetch details for repository: {repo}")
             logging.error(f"Response Status Code: {repo_response.status_code}")
             logging.error(f"Response Text: {repo_response.text}")
+
+        # Check for automated security fixes
+        security_fixes_url = f"{repo_url}/automated-security-fixes"
+        security_fixes_response = make_request_with_retry(security_fixes_url, headers, "Failed to fetch automated security fixes status")
         
+        if security_fixes_response and security_fixes_response.status_code == 200:
+            security_fixes_data = security_fixes_response.json()
+            automated_security_fixes = "False" if security_fixes_data.get("enabled") == False else "True"
+        else:
+            automated_security_fixes = "Failed to fetch"
+
         # Add the result to the table
-        table.add_row(organization, repo, repo_url, languages)
+        table.add_row(organization, repo, repo_url, languages, automated_security_fixes)
         
         # Write the result to the CSV file
-        writer.writerow([organization, repo, repo_url, languages])
+        writer.writerow([organization, repo, repo_url, languages, automated_security_fixes])
 
 # Print the table to the console
 CONSOLE.print(table)
@@ -231,3 +252,6 @@ table_filename = output_dir / f"huntr_repositories_table_{datetime.now().strftim
 with open(table_filename, 'w') as f:
     table_text = CONSOLE.export_text()
     f.write(table_text)
+
+print_message(MessageType.SUCCESS, f"CSV file saved: {csv_filename}\n")
+print_message(MessageType.SUCCESS, f"Table file saved: {table_filename}\n")
