@@ -44,6 +44,8 @@ logging.basicConfig(
     ]
 )
 
+print_message(MessageType.SUCCESS, f"Instantiated logging: {log_filename}\n")
+
 CONSOLE = Console(record=True)
 
 # Define the message types
@@ -143,12 +145,16 @@ if not github_token:
     print_message(MessageType.FATAL, "Error: GITHUB_TOKEN environment variable is not set.")
     sys.exit(1)
 
+print_message(MessageType.INFO, f"Scraping programs from https://huntr.com/bounties..\n")
+
 # Make a GET request to the URL
 url = 'https://huntr.com/bounties'
 response = requests.get(url)
 
 # Parse the HTML content using BeautifulSoup
 soup = BeautifulSoup(response.content, 'html.parser')
+
+print_message(MessageType.INFO, f"Parsing program info..\n")
 
 # Find all bounty items
 bounty_items = soup.find_all('div', class_='group flex flex-row')
@@ -182,6 +188,8 @@ headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
+print_message(MessageType.INFO, f"Writing results to CSV {csv_filename} and console {table_filename}..\n")
+
 # Create a table for console output
 table = Table(title="GitHub Repositories")
 table.add_column("Organization", justify="left", style="cyan", no_wrap=True)
@@ -193,6 +201,8 @@ csv_filename = output_dir / f"huntr_repositories_{datetime.now().strftime('%Y%m%
 with open(csv_filename, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(["Organization", "Repo", "Repo URL", "Languages"])
+
+print_message(MessageType.INFO, f"Instantiating GitHub API requests..\n")
 
     for organization, repo in repos:
         repo_url = f"{github_api_base_url}/{organization}/{repo}"
@@ -281,4 +291,6 @@ with open(workflow_matches_filename, 'w') as f:
     else:
         f.write("No 'workflow_dispatch_trigger' found in any repository.\n")
 
-print_message(MessageType.SUCCESS, f"Workflow dispatch trigger matches saved to {workflow_matches_filename}")
+print_message(MessageType.SUCCESS, f"Workflow dispatch trigger matches saved to {workflow_matches_filename}\n")
+print_message(MessageType.SUCCESS, f"CSV file saved: {csv_filename}\n")
+print_message(MessageType.SUCCESS, f"Table file saved: {table_filename}\n")
