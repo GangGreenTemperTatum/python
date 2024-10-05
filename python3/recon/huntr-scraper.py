@@ -175,7 +175,13 @@ headers = {
 print_message(MessageType.INFO, f"Writing results to CSV and console ..\n")
 
 # Create a table for console output
-table = Table(title="GitHub Repositories", box=box.MINIMAL_HEAVY_HEAD, show_lines=True)
+table = Table(
+    title="GitHub Repositories",
+    box=box.MINIMAL_HEAVY_HEAD,
+    show_lines=True,
+    title_style="bold magenta",
+    header_style="bold cyan"
+)
 table.add_column("Organization", style="cyan", no_wrap=True)
 table.add_column("Repo", style="magenta", no_wrap=True)
 table.add_column("Repo URL", style="green", no_wrap=True)
