@@ -1,7 +1,7 @@
 from enum import Enum
 from rich.console import Console
 from rich.style import Style
-from rich.table import Table
+from rich.table import Table, box
 from rich.logging import RichHandler
 
 import requests
@@ -191,11 +191,19 @@ headers = {
 print_message(MessageType.INFO, f"Writing results to CSV and console..\n")
 
 # Create a table for console output
-table = Table(title="GitHub Repositories")
+# Create a table for console output
+table = Table(
+    title="GitHub Repositories",
+    box=box.MINIMAL_HEAVY_HEAD,
+    show_lines=True,
+    title_style="bold magenta",
+    header_style="bold cyan"
+)
+table = Table(title="GitHub Repositories", box=box.ROUNDED)
 table.add_column("Organization", justify="left", style="cyan", no_wrap=True)
 table.add_column("Repo", justify="left", style="magenta", no_wrap=True)
-table.add_column("Repo URL", justify="left", style="green", no_wrap=True)
-table.add_column("Languages", justify="left", style="yellow", no_wrap=True)
+table.add_column("Repo URL", justify="left", style="green", width=40, overflow="fold")
+table.add_column("Languages", justify="left", style="yellow", width=40, overflow="fold")
 
 csv_filename = output_dir / f"huntr_repositories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 with open(csv_filename, mode='w', newline='') as file:
