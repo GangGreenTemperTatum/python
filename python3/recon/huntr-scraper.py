@@ -18,6 +18,7 @@ import csv
 import logging
 from datetime import datetime
 import subprocess
+from subprocess import TimeoutExpired
 from pathlib import Path
 
 # Setup base directories
@@ -86,9 +87,17 @@ def clone_repo(org, repo):
     clone_url = f"https://github.com/{org}/{repo}.git"
     
     try:
-        subprocess.run(["git", "clone", clone_url, str(repo_path)], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "clone", clone_url, str(repo_path)], 
+                       check=True, capture_output=True, text=True, timeout=30)
         print_message(MessageType.SUCCESS, f"Cloned repository: {clone_url} to {repo_path}")
         return True
+    except TimeoutExpired:
+        print_message(MessageType.FATAL, f"Cloning repository timed out after 30 seconds: {clone_url}")
+        logging.error(f"Git clone timeout: {clone_url}")
+        # Clean up the partially cloned repository
+        if repo_path.exists():
+            subprocess.run(["rm", "-rf", str(repo_path)])
+        return False
     except subprocess.CalledProcessError as e:
         print_message(MessageType.FATAL, f"Failed to clone repository: {clone_url}")
         logging.error(f"Git clone error: {e.stderr}")
