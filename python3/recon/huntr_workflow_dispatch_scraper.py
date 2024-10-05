@@ -124,7 +124,7 @@ def make_request_with_retry(url, headers, error_message, max_retries=3, backoff_
             logging.error(f"Request error: {str(e)}")
             return None
 
-# Function to search for workflow_dispatch_trigger in a repository
+# Function to search for pull_request_target_trigger in a repository
 def search_repo(repo_path, search_string):
     try:
         cmd = f"grep -r -n '{search_string}' {repo_path}"
@@ -265,30 +265,30 @@ with open(table_filename, 'w') as f:
     table_text = CONSOLE.export_text()
     f.write(table_text)
 
-# Additional step: Search for workflow_dispatch_trigger in cloned repositories
-print_message(MessageType.INFO, "Searching for 'workflow_dispatch_trigger' in cloned repositories...")
+# Additional step: Search for pull_request_target in cloned repositories
+print_message(MessageType.INFO, "Searching for 'pull_request_target' in cloned repositories...")
 workflow_matches = {}
 
 for organization, repo in repos:
     repo_path = repos_dir / organization / repo
     if repo_path.exists():
-        matches = search_repo(repo_path, "workflow_dispatch_trigger")
+        matches = search_repo(repo_path, "pull_request_target")
         if matches:
             workflow_matches[f"{organization}/{repo}"] = matches
 
-# Print and log the workflow_dispatch_trigger matches
+# Print and log the pull_request_target_trigger matches
 if workflow_matches:
-    print_message(MessageType.SUCCESS, "Found 'workflow_dispatch_trigger' in the following repositories:")
+    print_message(MessageType.SUCCESS, "Found 'pull_request_target_trigger' in the following repositories:")
     for repo, matches in workflow_matches.items():
         print_message(MessageType.INFO, f"Repository: {repo}")
         for match in matches:
             print_message(MessageType.INFO, f"  {match}")
-        logging.info(f"workflow_dispatch_trigger matches in {repo}:\n" + "\n".join(matches))
+        logging.info(f"pull_request_target_trigger matches in {repo}:\n" + "\n".join(matches))
 else:
-    print_message(MessageType.INFO, "No 'workflow_dispatch_trigger' found in any repository.")
+    print_message(MessageType.INFO, "No 'pull_request_target_trigger' found in any repository.")
 
-# Save workflow_dispatch_trigger matches to a file
-workflow_matches_filename = output_dir / f"workflow_dispatch_trigger_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+# Save pull_request_target_trigger matches to a file
+workflow_matches_filename = output_dir / f"pull_request_target_trigger_matches_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 with open(workflow_matches_filename, 'w') as f:
     if workflow_matches:
         for repo, matches in workflow_matches.items():
@@ -297,8 +297,8 @@ with open(workflow_matches_filename, 'w') as f:
                 f.write(f"  {match}\n")
             f.write("\n")
     else:
-        f.write("No 'workflow_dispatch_trigger' found in any repository.\n")
+        f.write("No 'pull_request_target_trigger' found in any repository.\n")
 
-print_message(MessageType.SUCCESS, f"Workflow dispatch trigger matches saved to {workflow_matches_filename}\n")
+print_message(MessageType.SUCCESS, f"pull_request_target trigger matches saved to {workflow_matches_filename}\n")
 print_message(MessageType.SUCCESS, f"CSV file saved: {csv_filename}\n")
 print_message(MessageType.SUCCESS, f"Table file saved: {table_filename}\n")
