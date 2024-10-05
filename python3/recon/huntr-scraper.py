@@ -5,6 +5,9 @@ from rich.table import Table
 from rich.logging import RichHandler
 
 import requests
+from requests.exceptions import RequestException, ConnectionError, Timeout
+import time
+
 from bs4 import BeautifulSoup
 import os
 import sys
@@ -14,15 +17,28 @@ from urllib.parse import unquote
 import csv
 import logging
 from datetime import datetime
+import subprocess
+from pathlib import Path
+
+# Setup base directories
+home_dir = Path.home()
+base_dir = home_dir / "git" / "bounties"
+log_dir = base_dir / "logs"
+output_dir = base_dir / "output"
+repos_dir = base_dir / "repositories"
+
+# Create necessary directories
+for directory in [log_dir, output_dir, repos_dir]:
+    directory.mkdir(parents=True, exist_ok=True)
 
 # Setup logging
-log_filename = f"log_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+log_filename = log_dir / f"log_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         RichHandler(),
-        logging.FileHandler(log_filename)
+        logging.FileHandler(str(log_filename))
     ]
 )
 
@@ -57,6 +73,44 @@ def print_message(message_type, message):
     emoji = emojis.get(message_type, "")
     CONSOLE.print(f"{emoji} {message}", style=style)
     logging.info(f"{emoji} {message}")
+
+# Function to clone repositories
+def clone_repo(org, repo):
+    repo_path = repos_dir / org / repo
+    
+    if repo_path.exists():
+        print_message(MessageType.WARN, f"Directory already exists: {repo_path}")
+        return False
+    
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+    clone_url = f"https://github.com/{org}/{repo}.git"
+    
+    try:
+        subprocess.run(["git", "clone", clone_url, str(repo_path)], check=True, capture_output=True, text=True)
+        print_message(MessageType.SUCCESS, f"Cloned repository: {clone_url} to {repo_path}")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_message(MessageType.FATAL, f"Failed to clone repository: {clone_url}")
+        logging.error(f"Git clone error: {e.stderr}")
+        return False
+
+# Function for retrying requests
+def make_request_with_retry(url, headers, error_message, max_retries=3, backoff_factor=0.3):
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            return response
+        except (ConnectionError, Timeout) as e:
+            if attempt == max_retries - 1:
+                print_message(MessageType.FATAL, f"{error_message}: {url}")
+                logging.error(f"Connection error: {str(e)}")
+                return None
+            time.sleep(backoff_factor * (2 ** attempt))
+        except RequestException as e:
+            print_message(MessageType.FATAL, f"{error_message}: {url}")
+            logging.error(f"Request error: {str(e)}")
+            return None
 
 # Check if the GitHub token is set
 github_token = os.getenv('GITHUB_TOKEN')
@@ -108,51 +162,71 @@ table = Table(title="GitHub Repositories")
 table.add_column("Organization", justify="left", style="cyan", no_wrap=True)
 table.add_column("Repo", justify="left", style="magenta", no_wrap=True)
 table.add_column("Status", justify="left", style="green", no_wrap=True)
+table.add_column("Languages", justify="left", style="yellow", no_wrap=True)
 
 # Open a CSV file to write the results
-csv_filename = f"huntr_repositories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+csv_filename = output_dir / f"huntr_repositories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 with open(csv_filename, mode='w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(["Organization", "Repo", "Status"])
+    writer.writerow(["Organization", "Repo", "Status", "Languages"])
 
-    # Fetch organization information for each repo repository
     for organization, repo in repos:
         repo_url = f"{github_api_base_url}/{organization}/{repo}"
         print_message(MessageType.INFO, f"Requesting URL: {repo_url}")
         logging.info(f"Request Headers: {headers}")
         
-        repo_response = requests.get(repo_url, headers=headers)
+        repo_response = make_request_with_retry(repo_url, headers, "Failed to fetch repository details")
         
-        if repo_response.status_code == 200:
+        if repo_response is None:
+            status = f"{repo_url} (failed to fetch)"
+            languages = "N/A"
+        elif repo_response.status_code == 200:
             repo_data = repo_response.json()
-            # Pretty-print the response JSON
             logging.info(f"Response JSON: {json.dumps(repo_data, indent=2)}")
             
-            # Extract and print the organization information
             if 'organization' in repo_data:
                 org_info = repo_data['organization']
                 status = repo_url
                 print_message(MessageType.SUCCESS, f"Repository: {repo}, Organization: {org_info['login']}")
+                
+                # Clone the repository
+                cloned = clone_repo(organization, repo)
+                if cloned:
+                    status += " (cloned)"
+                else:
+                    status += " (already exists)"
+                
+                # Fetch languages
+                languages_url = f"{repo_url}/languages"
+                languages_response = make_request_with_retry(languages_url, headers, "Failed to fetch languages")
+                
+                if languages_response and languages_response.status_code == 200:
+                    languages_data = languages_response.json()
+                    languages = ", ".join(languages_data.keys())
+                else:
+                    languages = "Failed to fetch"
             else:
                 status = repo_url
+                languages = "N/A"
                 print_message(MessageType.WARN, f"Repository: {repo}, Organization: Not available")
         else:
-            status = repo_url
+            status = f"{repo_url} (HTTP {repo_response.status_code})"
+            languages = "N/A"
             print_message(MessageType.FATAL, f"Failed to fetch details for repository: {repo}")
             logging.error(f"Response Status Code: {repo_response.status_code}")
             logging.error(f"Response Text: {repo_response.text}")
         
         # Add the result to the table
-        table.add_row(organization, repo, status)
+        table.add_row(organization, repo, status, languages)
         
         # Write the result to the CSV file
-        writer.writerow([organization, repo, status])
+        writer.writerow([organization, repo, status, languages])
 
 # Print the table to the console
 CONSOLE.print(table)
 
 # Save the table to a file
-table_filename = f"table_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+table_filename = output_dir / f"table_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 with open(table_filename, 'w') as f:
     table_text = CONSOLE.export_text()
     f.write(table_text)
