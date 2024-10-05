@@ -170,14 +170,14 @@ headers = {
 table = Table(title="GitHub Repositories")
 table.add_column("Organization", justify="left", style="cyan", no_wrap=True)
 table.add_column("Repo", justify="left", style="magenta", no_wrap=True)
-table.add_column("Status", justify="left", style="green", no_wrap=True)
+table.add_column("Repo URL", justify="left", style="green", no_wrap=True)
 table.add_column("Languages", justify="left", style="yellow", no_wrap=True)
 
 # Open a CSV file to write the results
 csv_filename = output_dir / f"huntr_repositories_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 with open(csv_filename, mode='w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(["Organization", "Repo", "Status", "Languages"])
+    writer.writerow(["Organization", "Repo", "Repo URL", "Languages"])
 
     for organization, repo in repos:
         repo_url = f"{github_api_base_url}/{organization}/{repo}"
@@ -187,7 +187,6 @@ with open(csv_filename, mode='w', newline='') as file:
         repo_response = make_request_with_retry(repo_url, headers, "Failed to fetch repository details")
         
         if repo_response is None:
-            status = f"{repo_url} (failed to fetch)"
             languages = "N/A"
         elif repo_response.status_code == 200:
             repo_data = repo_response.json()
@@ -195,15 +194,10 @@ with open(csv_filename, mode='w', newline='') as file:
             
             if 'organization' in repo_data:
                 org_info = repo_data['organization']
-                status = repo_url
                 print_message(MessageType.SUCCESS, f"Repository: {repo}, Organization: {org_info['login']}")
                 
                 # Clone the repository
                 cloned = clone_repo(organization, repo)
-                if cloned:
-                    status += " (cloned)"
-                else:
-                    status += " (already exists)"
                 
                 # Fetch languages
                 languages_url = f"{repo_url}/languages"
@@ -215,27 +209,25 @@ with open(csv_filename, mode='w', newline='') as file:
                 else:
                     languages = "Failed to fetch"
             else:
-                status = repo_url
                 languages = "N/A"
                 print_message(MessageType.WARN, f"Repository: {repo}, Organization: Not available")
         else:
-            status = f"{repo_url} (HTTP {repo_response.status_code})"
             languages = "N/A"
             print_message(MessageType.FATAL, f"Failed to fetch details for repository: {repo}")
             logging.error(f"Response Status Code: {repo_response.status_code}")
             logging.error(f"Response Text: {repo_response.text}")
         
         # Add the result to the table
-        table.add_row(organization, repo, status, languages)
+        table.add_row(organization, repo, repo_url, languages)
         
         # Write the result to the CSV file
-        writer.writerow([organization, repo, status, languages])
+        writer.writerow([organization, repo, repo_url, languages])
 
 # Print the table to the console
 CONSOLE.print(table)
 
 # Save the table to a file
-table_filename = output_dir / f"table_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+table_filename = output_dir / f"huntr_repositories_table_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 with open(table_filename, 'w') as f:
     table_text = CONSOLE.export_text()
     f.write(table_text)
