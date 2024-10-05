@@ -44,8 +44,6 @@ logging.basicConfig(
     ]
 )
 
-print_message(MessageType.SUCCESS, f"Instantiated logging: {log_filename}\n")
-
 CONSOLE = Console(record=True)
 
 # Define the message types
@@ -77,6 +75,8 @@ def print_message(message_type, message):
     emoji = emojis.get(message_type, "")
     CONSOLE.print(f"{emoji} {message}", style=style)
     logging.info(f"{emoji} {message}")
+
+print_message(MessageType.SUCCESS, f"Instantiated logging: {log_filename}\n")
 
 # Function to clone repositories
 def clone_repo(org, repo):
@@ -188,7 +188,7 @@ headers = {
     'X-GitHub-Api-Version': '2022-11-28'
 }
 
-print_message(MessageType.INFO, f"Writing results to CSV {csv_filename} and console {table_filename}..\n")
+print_message(MessageType.INFO, f"Writing results to CSV and console..\n")
 
 # Create a table for console output
 table = Table(title="GitHub Repositories")
@@ -202,7 +202,7 @@ with open(csv_filename, mode='w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(["Organization", "Repo", "Repo URL", "Languages"])
 
-print_message(MessageType.INFO, f"Instantiating GitHub API requests..\n")
+    print_message(MessageType.INFO, f"Instantiating GitHub API requests..\n")
 
     for organization, repo in repos:
         repo_url = f"{github_api_base_url}/{organization}/{repo}"
